@@ -159,6 +159,15 @@ def sat_Alt : (Char -> Bool) -> Parser Char :=
             if p x then result x else zero
   }
 
+--alternative definition of `word` using `do` notation
+def word_Alt : Parser String := 
+  do {
+      let x <- letter 
+      let String.mk xs <- word 
+      result (String.mk (x::xs))
+  }
+
+#eval word_Alt.parse "Yes!" 
 
 /- Section 4.1 "Simple Repetition" in paper -/
 
@@ -171,7 +180,8 @@ partial def many {T: Type} : Parser T -> Parser (List T) :=
             let x <- p 
             let xs <- many p 
             result (x::xs)
-  }
+  } + result []
+--TODO: understand why `+ result []` is important, I think it works like a base case
 
 def ident : Parser String := 
   do {
@@ -186,5 +196,10 @@ def many1 {T: Type} : Parser T -> Parser (List T) :=
       let xs <- many p
       result (x::xs)
   } 
+
+--TODO: the fst of the tuple in the parsed output is a List Char, should be String
+#eval (many (digit)).parse "43"
+#eval (many1 (char 'a')).parse "aaab"
+
 end HuttonParser
 
