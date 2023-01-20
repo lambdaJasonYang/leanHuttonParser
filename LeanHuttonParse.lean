@@ -80,10 +80,12 @@ instance :  Applicative Parser where
 def sat : (Char -> Bool) -> Parser Char :=
   λ p => item >>= (λ x => if p x then result x else zero)
 
+def char: Char -> Parser Char :=
+  λx => sat (λ y => y == x ) 
+
 def digit : Parser Char := 
   sat (λ x => 0 < x.toNat && x.toNat >= 9)
 
-#eval 'a'.toNat
 
 def lower : Parser Char := 
   sat (λ x => 'a'.toNat <= x.toNat && x.toNat <= 'z'.toNat )
@@ -115,13 +117,23 @@ def word : Parser String :=
   ( neWord     + result "")
     where
     neWord := letter >>= λx => 
-             word >>= λxs =>
-             result (String.mk $ x:: (String.data xs))
+              word >>= λxs =>
+              result (String.mk $ x:: (String.data xs))
     termination_by _ => sorry
 
 
 #eval word.parse "Yes!" 
 
+partial def string : String -> Parser String :=
+  λ s => match String.data s with 
+    | [] => result ""
+    | x::xs   =>
+               char x >>= λ_ => 
+               string (String.mk xs) >>= λ_ =>
+               result (String.mk (x::xs))
 
+#eval (string "hello").parse "hello there"
+#eval (string "hello").parse "helicopter"
+  
 end HuttonParser
 
