@@ -159,5 +159,32 @@ def sat_Alt : (Char -> Bool) -> Parser Char :=
             if p x then result x else zero
   }
 
+
+/- Section 4.1 "Simple Repetition" in paper -/
+
+/-NOTE: list comprehension is used in the original paper
+but since lean doesnt have native support without using macros
+we use `do` notation-/
+
+partial def many {T: Type} : Parser T -> Parser (List T) :=
+  λ p => do {
+            let x <- p 
+            let xs <- many p 
+            result (x::xs)
+  }
+
+def ident : Parser String := 
+  do {
+    let x <- lower 
+    let xs <- many alphanum
+    result (String.mk (x::xs))
+  }
+
+def many1 {T: Type} : Parser T -> Parser (List T) :=
+  λ p => do {
+      let x <- p
+      let xs <- many p
+      result (x::xs)
+  } 
 end HuttonParser
 
