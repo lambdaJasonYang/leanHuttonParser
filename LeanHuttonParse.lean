@@ -97,6 +97,8 @@ def upper : Parser Char :=
 #eval (lower >>= λ x => lower >>= λ y => result [x, y]).parse "abcd"
 
 
+
+
 instance: Add (Parser (T: Type)) where  
   add : Parser T -> Parser T -> Parser T :=
     λ ⟨p⟩ ⟨q⟩  => Parser.mk λ inp => (p inp ++ q inp) 
@@ -110,11 +112,12 @@ def alphanum : Parser Char :=
 def word' : String -> List () := 
 
 /-
-lean doesnt detect Parser String being isomorphic to a function type.
-but it will still run
+Typically we can use `partial def` for recursive functions like `word`
+BUT lean doesnt detect Parser String being isomorphic to a function type.
+BUT it will still run
 -/
 def word : Parser String :=
-  ( neWord     + result "")
+  neWord  + result ""
     where
     neWord := letter >>= λx => 
               word >>= λxs =>
@@ -134,6 +137,27 @@ partial def string : String -> Parser String :=
 
 #eval (string "hello").parse "hello there"
 #eval (string "hello").parse "helicopter"
+
   
+--alternative definition of `string` above using `do` notation
+partial def string_Alt : String -> Parser String :=
+  λ s => match String.data s with 
+    | [] => do {result ""}
+    | x::xs => do {
+                  let _ <- char x
+                  let _ <- string (String.mk xs)
+                  result (String.mk (x::xs))
+          }
+
+#eval (string_Alt "hello").parse "hello there"
+#eval (string_Alt "hello").parse "helicopter"
+
+--alternative definition of `sat` using `do` notation
+def sat_Alt : (Char -> Bool) -> Parser Char := 
+  λ p => do {
+            let x <- item
+            if p x then result x else zero
+  }
+
 end HuttonParser
 
