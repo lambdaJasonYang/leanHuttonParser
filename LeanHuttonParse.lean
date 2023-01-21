@@ -100,7 +100,7 @@ def upper : Parser Char :=
 
 #eval lower.parse "hid"
 #eval digit.parse "3"
-#eval digit.parse "-3" --should be `[]` aka unmatched parser due to `-` unicode
+#eval digit.parse "-3" --`[]` as expected; unmatched parser due to `-` unicode
 #eval (lower >>= λ x => lower >>= λ y => result [x, y]).parse "abcd"
 
 
@@ -245,7 +245,7 @@ def int : Parser Int :=
       result (-n )
   } + nat
 
-#eval nat.parse "-324"  --should be `[]` AKA unmatched parser
+#eval nat.parse "-324"  --`[]` as expected; unmatched parser since negative symbol is not parsed
 #eval int.parse "-324"
 
 
@@ -266,6 +266,8 @@ def ints : Parser (List Int) :=
 
 #eval ints.parse "[4,6,7]"
 
+--TODO: ints_Alt1
+
 
 def sepby1 {S T : Type} : Parser S -> Parser T -> Parser (List S) :=
   λ p sep => do {
@@ -278,7 +280,7 @@ def sepby1 {S T : Type} : Parser S -> Parser T -> Parser (List S) :=
                   result (x::xs) 
                 }
 
-def ints_Alt1 : Parser (List Int) := 
+def ints_Alt2 : Parser (List Int) := 
   do {
       let _ <- char '['
       let ns <- sepby1 int (char ',')
@@ -287,7 +289,7 @@ def ints_Alt1 : Parser (List Int) :=
   }
 
 #eval ints.parse "[-3,4,5]"
-#eval ints_Alt1.parse "[-3,4,5]"
+#eval ints_Alt2.parse "[-3,4,5]"
 
 
 def bracket {A B C : Type}: Parser A -> Parser B -> Parser C -> Parser B :=
@@ -298,18 +300,119 @@ def bracket {A B C : Type}: Parser A -> Parser B -> Parser C -> Parser B :=
                         result x
                       } 
 
-def ints_Alt2 : Parser (List Int) := 
+def ints_Alt3 : Parser (List Int) := 
   bracket (char '[') (sepby1 int (char ',') ) (char ']')
 
 #eval ints.parse "[-3,4,5]"
-#eval ints_Alt2.parse "[-3,4,5]"
+#eval ints_Alt3.parse "[-3,4,5]"
 
 def sepby {A B : Type} : Parser A -> Parser B -> Parser (List A) :=
   λ p sep => (sepby1 p sep ) + result []
 
 /-Section 4.3 "Repetition with meaningful separators"-/
 
+/- BNF notation
 
+expr    ::=   expr addop factor  |  factor 
+addop   ::=   +  |  -
+factor  ::=   nat  |  (expr)
+
+The grammar can be directly translated into a combinator parser
+-/
+
+
+--as per the paper, the below definition will not terminate and causes a stack overflow
+--comment it in and see
+/-
+mutual 
+def expr : Parser Int :=
+  do{
+      let x <- expr 
+      let f <- addop
+      let y <- factor
+      result (f x y)
+  } + factor 
+  
+def addop : Parser (Int -> Int -> Int) :=
+  do{
+    let _ <- char '+'
+    result (. + .) 
+  } +
+  do{
+    let _ <- char '-'
+    result (. - .)
+  }
+
+def factor : Parser Int :=
+  nat + bracket (char '(') expr (char '(')
+
+end
+termination_by _ => sorry
+
+#eval expr.parse "2+3"
+-/
+
+mutual 
+def expr : Parser Int :=
+  do{
+    let x <- factor 
+    let fys <- many (do{
+                        let f <- addop  
+                        let y <- factor
+                        result (f,y)
+                    })
+    result (List.foldl (λ x' (f,y) => f x' y ) x fys )
+
+  }
+def addop : Parser (Int -> Int -> Int) :=
+  do{
+    let _ <- char '+'
+    result (. + .) 
+  } +
+  do{
+    let _ <- char '-'
+    result (. - .)
+  }
+
+def factor : Parser Int :=
+  nat + bracket (char '(') expr (char ')')
+
+end
+termination_by _ => sorry
+
+#eval expr.parse "1+2-(3+4)"
+
+def chainl1 {A : Type} : Parser A -> Parser (A -> A -> A) -> Parser A :=
+  λ p op => do{
+              let x <- p 
+              let fys <- many (do{
+                                let f <- op
+                                let y <- p
+                                result (f,y)
+                              })
+              result (List.foldl (λ x' (f,y) => f x' y) x fys)
+  }
+
+
+/-An alternative method use chainl1 -/
+mutual 
+def expr_Alt : Parser Int :=
+  chainl1 factor addop
+def addop_Alt : Parser (Int -> Int -> Int) :=
+  do{
+    let _ <- char '+'
+    result (. + .) 
+  } +
+  do{
+    let _ <- char '-'
+    result (. - .)
+  }
+
+def factor_Alt : Parser Int :=
+  nat + bracket (char '(') expr_Alt (char ')')
+
+end
+termination_by _ => sorry
 
 end HuttonParser
 
