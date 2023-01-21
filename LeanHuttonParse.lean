@@ -267,6 +267,49 @@ def ints : Parser (List Int) :=
 #eval ints.parse "[4,6,7]"
 
 
+def sepby1 {S T : Type} : Parser S -> Parser T -> Parser (List S) :=
+  λ p sep => do {
+                  let x <- p 
+                  let xs <- many (do {
+                    let _ <- sep 
+                    let y <- p 
+                    result y
+                  })
+                  result (x::xs) 
+                }
+
+def ints_Alt1 : Parser (List Int) := 
+  do {
+      let _ <- char '['
+      let ns <- sepby1 int (char ',')
+      let _ <- char ']'
+      result ns
+  }
+
+#eval ints.parse "[-3,4,5]"
+#eval ints_Alt1.parse "[-3,4,5]"
+
+
+def bracket {A B C : Type}: Parser A -> Parser B -> Parser C -> Parser B :=
+  λ open' p close => do {
+                        let _ <- open'
+                        let x <- p 
+                        let _ <- close   
+                        result x
+                      } 
+
+def ints_Alt2 : Parser (List Int) := 
+  bracket (char '[') (sepby1 int (char ',') ) (char ']')
+
+#eval ints.parse "[-3,4,5]"
+#eval ints_Alt2.parse "[-3,4,5]"
+
+def sepby {A B : Type} : Parser A -> Parser B -> Parser (List A) :=
+  λ p sep => (sepby1 p sep ) + result []
+
+/-Section 4.3 "Repetition with meaningful separators"-/
+
+
 
 end HuttonParser
 
