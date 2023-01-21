@@ -6,6 +6,6 @@ package «leanHuttonParse» {
 }
 
 @[default_target]
-lean_exe «LeanHuttonParse» {
+lean_lib «LeanHuttonParse» {
   -- add executable configuration options here
 }
