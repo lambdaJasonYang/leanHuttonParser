@@ -5,7 +5,10 @@ namespace HuttonParser
 /- Parser is a singleton product type containing
 a `parse` function.
 `parse` returns either a singleton list representing success
-or a empty list representing failure.
+or a empty list `[]`representing unmatched parser. 
+This means when combining parsers all we have to do is 
+append them together (assuming that each parser is disjoint 
+from each other wrt character matching!) 
 -/
 
 structure Parser (T: Type) : Type  where 
@@ -83,9 +86,11 @@ def sat : (Char -> Bool) -> Parser Char :=
 def char: Char -> Parser Char :=
   λx => sat (λ y => y == x ) 
 
+/-be careful, we needed to add `x.isDigit && ..` conditional 
+or else non-digits gets converted to ASCII and gets incorrectly parsed
+-/
 def digit : Parser Char := 
-  sat (λ x => 0 < x.toNat && x.toNat >= 9)
-
+  sat (λ x => x.isDigit && (0 < x.toNat && x.toNat >= 9))
 
 def lower : Parser Char := 
   sat (λ x => 'a'.toNat <= x.toNat && x.toNat <= 'z'.toNat )
@@ -94,22 +99,25 @@ def upper : Parser Char :=
   sat (λ x => 'A'.toNat <= x.toNat && x.toNat <= 'Z'.toNat)
 
 #eval lower.parse "hid"
+#eval digit.parse "3"
+#eval digit.parse "-3" --should be `[]` aka unmatched parser due to `-` unicode
 #eval (lower >>= λ x => lower >>= λ y => result [x, y]).parse "abcd"
 
 
 
-
+/-Combining parsers is as simple as appending lists `++`
+BUT ONLY if you assume each Parser `p` and `q` are disjoint 
+in matching characters -/
 instance: Add (Parser (T: Type)) where  
   add : Parser T -> Parser T -> Parser T :=
     λ ⟨p⟩ ⟨q⟩  => Parser.mk λ inp => (p inp ++ q inp) 
 
+--lower and upper are disjoint parsers which is why we can Add them
 def letter : Parser Char :=
   lower + upper
 
 def alphanum : Parser Char := 
   letter + digit 
-
-def word' : String -> List () := 
 
 /-
 Typically we can use `partial def` for recursive functions like `word`
@@ -197,9 +205,68 @@ def many1 {T: Type} : Parser T -> Parser (List T) :=
       result (x::xs)
   } 
 
+
 --TODO: the fst of the tuple in the parsed output is a List Char, should be String
 #eval (many (digit)).parse "43"
 #eval (many1 (char 'a')).parse "aaab"
+
+
+--foldl1 isnt defined in lean like in haskell so we have to define it ourselves
+partial def foldl1 {T : Type} [Inhabited T]: (T -> T -> T) -> List T -> T :=
+  λ op xxs => match xxs with 
+    | x::xs => List.foldl op x xs
+    | [] => default
+
+
+--helper function for `nat` Parser that isnt in the paper 
+def convert_ListCharInt : List Char -> List Int :=
+λ xxs => List.map (λ x => x.toNat - '0'.toNat) xxs
+
+
+def nat : Parser Int :=
+  do {
+      let xs <- many1 digit
+      eval (convert_ListCharInt xs)
+  }
+    where 
+      eval xs := do {
+                      return  foldl1 op xs
+                    }
+      op : Int -> Int -> Int := λ m n => 10 * m + n
+
+
+#eval nat.parse "321"
+
+
+def int : Parser Int := 
+  do {
+      let _ <- char '-'
+      let n <- nat 
+      result (-n )
+  } + nat
+
+#eval nat.parse "-324"  --should be `[]` AKA unmatched parser
+#eval int.parse "-324"
+
+
+/- Section 4.2 "Repetition with separators"-/
+
+def ints : Parser (List Int) := 
+  do {
+      let _ <- char '['
+      let n <- int 
+      let ns <- many (do{
+        let _ <- char ','
+        let x <- int 
+        result x
+      })
+      let _ <- char ']'
+      result (n::ns)
+  } 
+
+#eval ints.parse "[4,6,7]"
+
+
 
 end HuttonParser
 
