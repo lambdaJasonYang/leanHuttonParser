@@ -4,8 +4,13 @@ namespace HuttonParser
 
 /- Parser is a singleton product type containing
 a `parse` function.
-`parse` returns either a singleton list representing success
-or a empty list `[]`representing unmatched parser. 
+`parse` returns typically a singleton list containing a 2-tuple with the 
+fst `T` representing the parsed AST wrt to the language and the 
+snd `String` representing the remaining string to be parsed. 
+It returns a singleton list when parsing in a deterministic fashion.
+It returns multiple 2-tuples in the list when parsing in a non-deterministic fashion since
+they can be multiple ways to interpret the string each represented by a different (AST,String) tuple.
+An empty list `[]`represents a unmatched parser. 
 This means when combining parsers all we have to do is 
 append them together (assuming that each parser is disjoint 
 from each other wrt character matching!) 
@@ -351,6 +356,8 @@ termination_by _ => sorry
 
 #eval expr.parse "2+3"
 -/
+
+--TO FIX: Below is incorrect
 
 mutual 
 def expr : Parser Int :=
